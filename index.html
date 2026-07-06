@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Auth</title>
+
+<style>
+body {
+    margin: 20px;
+    font-family: sans-serif;
+    color: black;
+}
+
+#status {
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+#log {
+    white-space: pre-wrap;
+}
+</style>
+</head>
+
+<body>
+
+<div id="status">GET OUT APE</div>
+<div id="log"></div>
+
+<script>
+
+const TITLE_ID = "26421";
+const PHOTON_APP_ID = "5869d1cf-c6e8-4615-9ed4-f5e51bedca85";
+
+let sessionTicket = "";
+let playFabId = "";
+
+const logBox = document.getElementById("log");
+
+function log(text) {
+    logBox.innerHTML += text + "<br>";
+}
+
+function setStatus(text) {
+    document.getElementById("status").innerText = text;
+}
+
+async function loginPlayFab() {
+    setStatus("Logging into PlayFab...");
+
+    const res = await fetch(`https://${TITLE_ID}.playfabapi.com/Client/LoginWithCustomID`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            TitleId: TITLE_ID,
+            CustomId: localStorage.getItem("pfid") || crypto.randomUUID(),
+            CreateAccount: true
+        })
+    });
+
+    const data = await res.json();
+
+    if (!data.data) {
+        setStatus("PlayFab login failed");
+        log(JSON.stringify(data, null, 2));
+        return;
+    }
+
+    sessionTicket = data.data.SessionTicket;
+    playFabId = data.data.PlayFabId;
+
+    localStorage.setItem("pfid", playFabId);
+
+    setStatus("PlayFab authenticated");
+    log("PlayFabId: " + playFabId);
+}
+
+async function photonAuth() {
+    setStatus("Authenticating Photon...");
+
+    const res = await fetch(`https://${TITLE_ID}.playfabapi.com/Client/GetPhotonAuthenticationToken`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-Authorization": sessionTicket
+        },
+        body: JSON.stringify({
+            PhotonApplicationId: PHOTON_APP_ID
+        })
+    });
+
+    const data = await res.json();
+
+    if (!data.data) {
+        setStatus("Photon auth failed");
+        log(JSON.stringify(data, null, 2));
+        return;
+    }
+
+    setStatus("Photon authenticated");
+    log("Photon Response:");
+    log(JSON.stringify(data, null, 2));
+}
+
+async function start() {
+    try {
+        await loginPlayFab();
+        await photonAuth();
+    } catch (e) {
+        setStatus("Error");
+        log(e.toString());
+    }
+}
+
+start();
+
+</script>
+
+</body>
+</html>
